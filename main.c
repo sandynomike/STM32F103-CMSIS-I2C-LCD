@@ -42,9 +42,9 @@
 //         B6 ----------- SCL
 //         B7 ----------- SDA
 //
-//                        LED Jumper -- [1k ohm] --\
+//                        LED Jumper -- [1k ohm] --,
 //                                                 |
-//                        LED Jumper --------------/
+//                        LED Jumper --------------`
 //
 //
 
@@ -66,7 +66,9 @@ main()
   I2C_LCD_init( I2C1 );              // Set the LCD interface to I2C1 and inialize it
   I2C_LCD_cmd( LCD_4B_58F_2L );
   I2C_LCD_cmd( LCD_CLEAR );
+  delay_us( 2e3 );                    // Min. 1.5 ms delay needed after LCD_CLEAR command
   I2C_LCD_cmd( LCD_HOME );
+  delay_us( 2e3 );                    // Min. 1.5 ms delay needed after LCD_HOME command
   I2C_LCD_cmd( LCD_ON_BLINK_CURSOR );
 
   I2C_LCD_puts( "Mike" );

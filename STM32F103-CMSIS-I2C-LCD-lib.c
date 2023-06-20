@@ -42,9 +42,9 @@
 //         B6 ----------- SCL
 //         B7 ----------- SDA
 //
-//                        LED Jumper -- [1k ohm] --\
+//                        LED Jumper -- [1k ohm] --,
 //                                                 |
-//                        LED Jumper --------------/
+//                        LED Jumper --------------'
 //
 //
 
@@ -53,12 +53,15 @@
 
 
 #include <stdlib.h>
+#include <string.h>
 #include "stm32f103x8.h"              // Primary CMSIS header file
 #include "STM32F103-CMSIS-I2C-lib.c"
 
+I2C_TypeDef *LCD_I2C;                 // Global variable to point to the I2C interface used for
+                                      // the LCD driver.
 
-// Pin-Bit definitions between the LCD module pins and the
-// I2C LCD driver module data-byte bits.
+
+// Pin-Bit definitions between the LCD module pins and the I2C LCD driver module data-byte bits.
 
 #define I2C_LCD_ADD 0x3F
 #define I2C_LCD_RS  0b00000001
@@ -88,11 +91,11 @@
 #define I2C_LCD_4B  0x02
 
 
+
 // I2C_LCD_init
-// Initialize the LCD display module. The first step is to initialize the
-// associated I2C port. Then there is a 20 ms wait time to give the display
-// module time to fully power up. Then the command is sent to set the LCD
-// module into the 4-bit mode.
+// Initialize the LCD display module. The first step is to initialize the associated I2C port.
+// Then there is a 20 ms wait time to give the display module time to fully power up. Then the
+// command is sent to set the LCD module into the 4-bit mode.
 void
 I2C_LCD_init( I2C_TypeDef *thisI2C )
 {
@@ -117,8 +120,8 @@ I2C_LCD_init( I2C_TypeDef *thisI2C )
 
 
 // I2C_LCD_cmd
-// Send command (not character) to LCD display. Commands are sent like data but
-// with the RS pin set LOW
+// Send command (not character) to LCD display. Commands are sent like data but with the RS pin
+// set LOW.
 void
 I2C_LCD_cmd( uint8_t data )
 {
@@ -127,15 +130,12 @@ I2C_LCD_cmd( uint8_t data )
   // Place upper nibble and EN and BL and WR
   I2C_data = (data & 0b11110000) | I2C_LCD_EN | I2C_LCD_BL;
   I2C_writeByte( LCD_I2C, I2C_data, I2C_LCD_ADD );
-  
   // Clear EN bit
   I2C_data =   I2C_LCD_BL  ;
   I2C_writeByte( LCD_I2C, I2C_data, I2C_LCD_ADD );
-
   // Place lower nibble and EN and BL and WR
   I2C_data = (data << 4) | I2C_LCD_EN | I2C_LCD_BL;
   I2C_writeByte( LCD_I2C, I2C_data, I2C_LCD_ADD );
-  
   // Clear EN bit
   I2C_data =  I2C_LCD_BL  ;
   I2C_writeByte( LCD_I2C, I2C_data, I2C_LCD_ADD );
@@ -152,15 +152,12 @@ I2C_LCD_putc( char data )
   // Place upper nibble and set EN, RS, and BL bits 
   I2C_data = (data & 0b11110000) | I2C_LCD_EN | I2C_LCD_RS | I2C_LCD_BL;
   I2C_writeByte( LCD_I2C, I2C_data, I2C_LCD_ADD );
-  
   // Clear EN bit
   I2C_data =  I2C_LCD_BL | I2C_LCD_RS ;
   I2C_writeByte( LCD_I2C, I2C_data, I2C_LCD_ADD );
-
   // Place lower nibble and set EN, RS, and BL bits
   I2C_data = (data << 4) | I2C_LCD_EN | I2C_LCD_RS | I2C_LCD_BL;
   I2C_writeByte( LCD_I2C, I2C_data, I2C_LCD_ADD );
-
   // Clear EN bit
   I2C_data =  I2C_LCD_BL | I2C_LCD_RS ;
   I2C_writeByte( LCD_I2C, I2C_data, I2C_LCD_ADD );
@@ -168,10 +165,9 @@ I2C_LCD_putc( char data )
 }
 
 
-//  LCD_puts
-//  Takes a pointer to a null-terminated string and displays that string
-//  from the current LCD cursor position. Does not check for LCD line/string
-//  overflow.
+// LCD_puts
+// Takes a pointer to a null-terminated string and displays that string from the current LCD 
+// cursor position. Does not check for LCD line/string overflow.
 void
 I2C_LCD_puts( char *data )
 {
@@ -184,5 +180,45 @@ I2C_LCD_puts( char *data )
       }
 }
 
+//  void
+//  i100toa( int16_t realV, char *thisString )
+//  i100toa takes a number with 2 decimal places multiplied by 100, and returns a string
+//  of the original decimal number rounded to 1 decimal place. For example, if the number
+//  in question is 12.36, then 1236 is passed via realV. The resulting string is 12.4,
+//  because 12.36 rounds up to 12.4. Negative numbers and more complex rounding work as
+//  expected. For example, -2.35, passed as -235, returns "-2.4", and 19.96, passed as 1996,
+//  "w" = -2 and "d" = 4. Also, 19.96 would return "w" = 20 and "d" = 0. Note that "w" and "d"
+//  are passed by reference.
+void
+i100toa( int16_t realV, char *thisString )
+{
+  char tmpString[6];              // Used to build output string. Might need to hold "-100\0"
+
+  int16_t  x = abs( realV );      // realV = 2596 (target: 26.0C) -> x = 2596
+  int16_t  w = x / 100;           // w (whole part) = 25
+  int16_t  f = x - ( w * 100 );   // f (fraction)   = 2596 - 2500 = 96
+  int16_t  d = f / 10;            // d (decimal)    = 9
+  int16_t  r = f - ( d * 10 );    // r (remainder)  = 96 - 90 = 6
+
+  if( r>=5 )                      // Round up if needed
+  {
+    d = d + 1;                    // d gets rounded up to 10
+    if( d >= 10 )                 // If d gets rounded up,
+    {
+      d = 0;                      // d = 0    zero out d and
+      w = w + 1;                  // w = 26   bump up w. 
+    }
+  }   
+  if( realV < 0 )                 // Start with negative sign if original value was negative
+    strcpy( thisString, "-" );
+  else                            // otherwise start with blank string.
+    strcpy( thisString, "" );
+
+  itoa( w, tmpString, 10 );         // Make whole part into string
+  strcat( thisString, tmpString );  // Tack onto thisString
+  strcat( thisString, "." );        // Add the decimal point
+  itoa( d, tmpString, 10 );         // Make a string for the single decimal place
+  strcat( thisString, tmpString );  // Tack on the decimal digit to the rest of the string
+}  
 
 #endif /* __STM32F103_CMSIS_I2C_LCD_LIB_C */
